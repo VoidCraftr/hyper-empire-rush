@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Smartphone, Monitor, Gamepad2, Headphones, Zap, DollarSign, Target, Trophy } from 'lucide-react';
+import { Smartphone, Monitor, Gamepad2, Headphones, Zap, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
-import AdSection from './AdSection';
-import AchievementSystem from './AchievementSystem';
-import PrestigeSystem from './PrestigeSystem';
 
 interface Product {
   id: string;
@@ -27,9 +23,6 @@ interface GameState {
   level: number;
   experience: number;
   experienceToNext: number;
-  totalUpgrades: number;
-  currentBoost: number;
-  boostEndTime: number;
 }
 
 const TechStore: React.FC = () => {
@@ -40,10 +33,7 @@ const TechStore: React.FC = () => {
     autoSellPower: 0,
     level: 1,
     experience: 0,
-    experienceToNext: 100,
-    totalUpgrades: 0,
-    currentBoost: 1,
-    boostEndTime: 0
+    experienceToNext: 100
   });
 
   const [products, setProducts] = useState<Product[]>([
@@ -89,8 +79,6 @@ const TechStore: React.FC = () => {
   const [screenShake, setScreenShake] = useState(false);
   const [comboMultiplier, setComboMultiplier] = useState(1);
   const [comboCount, setComboCount] = useState(0);
-  const [dailyGoal, setDailyGoal] = useState(1000);
-  const [dailyProgress, setDailyProgress] = useState(0);
 
   // Auto-sell effect
   useEffect(() => {
@@ -138,41 +126,12 @@ const TechStore: React.FC = () => {
     return () => clearTimeout(comboTimeout);
   }, [comboCount]);
 
-  // Boost timer effect
-  useEffect(() => {
-    if (gameState.boostEndTime > Date.now()) {
-      const timer = setInterval(() => {
-        if (Date.now() >= gameState.boostEndTime) {
-          setGameState(prev => ({
-            ...prev,
-            currentBoost: 1,
-            boostEndTime: 0
-          }));
-          toast.info('⚡ Boost expired!');
-        }
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [gameState.boostEndTime]);
-
-  // Daily goal reset
-  useEffect(() => {
-    const lastReset = localStorage.getItem('lastGoalReset');
-    const today = new Date().toDateString();
-    
-    if (lastReset !== today) {
-      setDailyProgress(0);
-      setDailyGoal(Math.max(1000, gameState.level * 500));
-      localStorage.setItem('lastGoalReset', today);
-    }
-  }, [gameState.level]);
-
   const sellProduct = useCallback((product: Product, event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    const earnings = Math.floor(product.sellPrice * gameState.clickPower * comboMultiplier * gameState.currentBoost);
+    const earnings = Math.floor(product.sellPrice * gameState.clickPower * comboMultiplier);
     const experience = Math.floor(earnings * 0.1);
     
     // Update combo
@@ -197,19 +156,6 @@ const TechStore: React.FC = () => {
       totalSales: prev.totalSales + earnings,
       experience: prev.experience + experience
     }));
-
-    // Update daily progress
-    setDailyProgress(prev => {
-      const newProgress = prev + earnings;
-      if (newProgress >= dailyGoal && prev < dailyGoal) {
-        toast.success('🎯 Daily goal completed! +200 coins bonus!', { duration: 3000 });
-        setGameState(prevState => ({
-          ...prevState,
-          coins: prevState.coins + 200
-        }));
-      }
-      return newProgress;
-    });
     
     // Big sale screen shake
     if (earnings > 100) {
@@ -238,8 +184,7 @@ const TechStore: React.FC = () => {
         setGameState(prevState => ({
           ...prevState,
           coins: prevState.coins - product.upgradeCost,
-          autoSellPower: prevState.autoSellPower + Math.floor(product.sellPrice * 0.1),
-          totalUpgrades: prevState.totalUpgrades + 1
+          autoSellPower: prevState.autoSellPower + Math.floor(product.sellPrice * 0.1)
         }));
         
         toast.success(`🚀 ${product.name} upgraded! +Auto-sell`, {
@@ -263,143 +208,11 @@ const TechStore: React.FC = () => {
     return `$${num}`;
   };
 
-  const handleAdReward = (reward: { type: 'coins' | 'boost' | 'xp'; amount: number; duration?: number }) => {
-    switch (reward.type) {
-      case 'coins':
-        setGameState(prev => ({ ...prev, coins: prev.coins + reward.amount }));
-        break;
-      case 'boost':
-        setGameState(prev => ({
-          ...prev,
-          currentBoost: reward.amount,
-          boostEndTime: Date.now() + (reward.duration || 300) * 1000
-        }));
-        break;
-      case 'xp':
-        setGameState(prev => ({ ...prev, experience: prev.experience + reward.amount }));
-        break;
-    }
-  };
-
-  const handleAchievementReward = (reward: { coins?: number; clickPower?: number; autoSell?: number }) => {
-    setGameState(prev => ({
-      ...prev,
-      coins: prev.coins + (reward.coins || 0),
-      clickPower: prev.clickPower + (reward.clickPower || 0),
-      autoSellPower: prev.autoSellPower + (reward.autoSell || 0)
-    }));
-  };
-
-  const handlePrestige = (bonuses: any[]) => {
-    // Calculate starting bonuses based on prestige bonuses
-    let startingCoins = 0;
-    let bonusClickPower = 0;
-    let bonusAutoSell = 0;
-    
-    bonuses.forEach(bonus => {
-      switch (bonus.id) {
-        case 'starting_coins':
-          startingCoins += bonus.currentLevel * 500;
-          break;
-        case 'click_power':
-          bonusClickPower += bonus.currentLevel;
-          break;
-        case 'auto_sell_boost':
-          bonusAutoSell += bonus.currentLevel * 2;
-          break;
-      }
-    });
-
-    // Reset game state with prestige bonuses
-    setGameState({
-      coins: startingCoins,
-      totalSales: 0,
-      clickPower: 1 + bonusClickPower,
-      autoSellPower: bonusAutoSell,
-      level: 1,
-      experience: 0,
-      experienceToNext: 100,
-      totalUpgrades: 0,
-      currentBoost: 1,
-      boostEndTime: 0
-    });
-
-    // Reset products
-    setProducts([
-      {
-        id: 'smartphone',
-        name: 'Smartphones',
-        icon: <Smartphone className="w-6 h-6" />,
-        basePrice: 10,
-        sellPrice: 15,
-        upgradeLevel: 1,
-        upgradeCost: 50
-      },
-      {
-        id: 'monitor',
-        name: 'Gaming Monitor',
-        icon: <Monitor className="w-6 h-6" />,
-        basePrice: 25,
-        sellPrice: 40,
-        upgradeLevel: 1,
-        upgradeCost: 150
-      },
-      {
-        id: 'gamepad',
-        name: 'Gaming Controller',
-        icon: <Gamepad2 className="w-6 h-6" />,
-        basePrice: 15,
-        sellPrice: 25,
-        upgradeLevel: 1,
-        upgradeCost: 100
-      },
-      {
-        id: 'headphones',
-        name: 'Gaming Headset',
-        icon: <Headphones className="w-6 h-6" />,
-        basePrice: 20,
-        sellPrice: 35,
-        upgradeLevel: 1,
-        upgradeCost: 120
-      }
-    ]);
-
-    setComboCount(0);
-    setComboMultiplier(1);
-    setDailyProgress(0);
-  };
-
   return (
     <div className={`min-h-screen p-4 ${screenShake ? 'screen-shake' : ''}`}>
       <div className="max-w-6xl mx-auto">
-        {/* Daily Goal */}
-        <Card className="p-4 card-glow mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="w-5 h-5 text-secondary" />
-            <h3 className="font-bold">Daily Goal</h3>
-            <Badge variant={dailyProgress >= dailyGoal ? "default" : "outline"}>
-              {Math.floor((dailyProgress / dailyGoal) * 100)}%
-            </Badge>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Progress</span>
-              <span>{formatNumber(dailyProgress)} / {formatNumber(dailyGoal)}</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div 
-                className="bg-gradient-secondary h-2 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min((dailyProgress / dailyGoal) * 100, 100)}%` }}
-              />
-            </div>
-            {dailyProgress >= dailyGoal && (
-              <p className="text-xs text-success">🎯 Goal completed! +200 coins bonus claimed!</p>
-            )}
-          </div>
-        </Card>
-
         {/* Header Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card className="p-4 card-glow">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-coin" />
@@ -440,56 +253,22 @@ const TechStore: React.FC = () => {
               </p>
             </div>
           </Card>
-
-          <Card className="p-4 card-glow">
-            <div>
-              <p className="text-sm text-muted-foreground">Boost</p>
-              <p className="text-xl font-bold text-accent neon-glow">
-                {gameState.currentBoost > 1 ? `${gameState.currentBoost}x` : 'None'}
-              </p>
-              {gameState.currentBoost > 1 && (
-                <p className="text-xs text-muted-foreground">
-                  {Math.ceil((gameState.boostEndTime - Date.now()) / 1000)}s left
-                </p>
-              )}
-            </div>
-          </Card>
         </div>
 
-        {/* Side Panels */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-          <div className="lg:col-span-1 space-y-4">
-            <AdSection 
-              onRewardClaimed={handleAdReward}
-              gameLevel={gameState.level}
-            />
-            <AchievementSystem
-              stats={{
-                totalSales: gameState.totalSales,
-                totalUpgrades: gameState.totalUpgrades,
-                level: gameState.level,
-                comboCount: comboCount
-              }}
-              onRewardClaimed={handleAchievementReward}
-            />
+        {/* Combo Indicator */}
+        {comboCount > 0 && (
+          <div className="text-center mb-4">
+            <div className="inline-block bg-gradient-accent px-4 py-2 rounded-lg neon-glow pop-in">
+              <span className="text-lg font-bold">
+                🔥 COMBO {comboCount} • {comboMultiplier.toFixed(1)}x MULTIPLIER!
+              </span>
+            </div>
           </div>
+        )}
 
-          <div className="lg:col-span-2">
-            {/* Combo Indicator */}
-            {comboCount > 0 && (
-              <div className="text-center mb-4">
-                <div className="inline-block bg-gradient-accent px-4 py-2 rounded-lg neon-glow pop-in">
-                  <span className="text-lg font-bold">
-                    🔥 COMBO {comboCount} • {comboMultiplier.toFixed(1)}x MULTIPLIER!
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Products Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              {products.map((product) => (
+        {/* Products Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {products.map((product) => (
             <Card key={product.id} className="p-4 relative overflow-hidden card-glow hover:scale-105 transition-transform duration-200">
               {/* Coin Animations */}
               {coinAnimations
@@ -523,10 +302,7 @@ const TechStore: React.FC = () => {
                   className="w-full pulse-glow"
                   onClick={(event) => sellProduct(product, event)}
                 >
-                  SELL {formatNumber(product.sellPrice * gameState.clickPower * gameState.currentBoost)}
-                  {gameState.currentBoost > 1 && (
-                    <span className="text-accent ml-1">({gameState.currentBoost}x)</span>
-                  )}
+                  SELL {formatNumber(product.sellPrice * gameState.clickPower)}
                 </Button>
                 
                 <Button
@@ -540,20 +316,7 @@ const TechStore: React.FC = () => {
                 </Button>
               </div>
             </Card>
-              ))}
-            </div>
-          </div>
-
-          <div className="lg:col-span-1">
-            <PrestigeSystem
-              gameState={{
-                level: gameState.level,
-                totalSales: gameState.totalSales,
-                coins: gameState.coins
-              }}
-              onPrestige={handlePrestige}
-            />
-          </div>
+          ))}
         </div>
 
         {/* Stats Footer */}
