@@ -77,8 +77,8 @@ const TechStore: React.FC = () => {
 
   const [coinAnimations, setCoinAnimations] = useState<Array<{ id: number; amount: number; x: number; y: number }>>([]);
   const [screenShake, setScreenShake] = useState(false);
-  const [comboMultiplier, setComboMultiplier] = useState(1);
-  const [comboCount, setComboCount] = useState(0);
+  const [productTimers, setProductTimers] = useState<{ [key: string]: number }>({});
+  const [productProgress, setProductProgress] = useState<{ [key: string]: number }>({});
 
   // Auto-sell effect
   useEffect(() => {
@@ -95,6 +95,73 @@ const TechStore: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [gameState.autoSellPower]);
+
+  // Product selling timers
+  useEffect(() => {
+    const intervals: { [key: string]: NodeJS.Timeout } = {};
+    
+    products.forEach(product => {
+      // Calculate sell time based on price (higher price = longer time)
+      const sellTime = Math.max(1000, product.sellPrice * 100); // 100ms per dollar, minimum 1 second
+      
+      intervals[product.id] = setInterval(() => {
+        // Update progress
+        setProductProgress(prev => {
+          const currentProgress = prev[product.id] || 0;
+          const newProgress = currentProgress + (100 / (sellTime / 100));
+          
+          if (newProgress >= 100) {
+            // Complete sale
+            const earnings = Math.floor(product.sellPrice * gameState.clickPower);
+            const experience = Math.floor(earnings * 0.1);
+            
+            // Add coin animation at random position
+            const animationId = Date.now() + Math.random();
+            setCoinAnimations(prevAnims => [...prevAnims, { 
+              id: animationId, 
+              amount: earnings, 
+              x: Math.random() * 200, 
+              y: Math.random() * 100 
+            }]);
+            
+            // Remove animation after completion
+            setTimeout(() => {
+              setCoinAnimations(prevAnims => prevAnims.filter(anim => anim.id !== animationId));
+            }, 800);
+            
+            // Update game state
+            setGameState(prevState => ({
+              ...prevState,
+              coins: prevState.coins + earnings,
+              totalSales: prevState.totalSales + earnings,
+              experience: prevState.experience + experience
+            }));
+            
+            // Big sale screen shake
+            if (earnings > 100) {
+              setScreenShake(true);
+              setTimeout(() => setScreenShake(false), 300);
+            }
+            
+            // Success toast
+            if (Math.random() > 0.8) {
+              toast.success(`💰 Sold ${product.name} for $${earnings}!`, {
+                duration: 1500,
+              });
+            }
+            
+            return { ...prev, [product.id]: 0 };
+          }
+          
+          return { ...prev, [product.id]: newProgress };
+        });
+      }, 100);
+    });
+    
+    return () => {
+      Object.values(intervals).forEach(clearInterval);
+    };
+  }, [products, gameState.clickPower]);
 
   // Level up effect
   useEffect(() => {
@@ -116,67 +183,6 @@ const TechStore: React.FC = () => {
     }
   }, [gameState.experience, gameState.experienceToNext, gameState.level]);
 
-  // Combo reset effect
-  useEffect(() => {
-    const comboTimeout = setTimeout(() => {
-      setComboMultiplier(1);
-      setComboCount(0);
-    }, 2000);
-    
-    return () => clearTimeout(comboTimeout);
-  }, [comboCount]);
-
-  const sellProduct = useCallback((product: Product, event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    const earnings = Math.floor(product.sellPrice * gameState.clickPower * comboMultiplier);
-    const experience = Math.floor(earnings * 0.1);
-    
-    // Update combo
-    setComboCount(prev => prev + 1);
-    if (comboCount > 0 && comboCount % 5 === 0) {
-      setComboMultiplier(prev => Math.min(prev + 0.5, 5));
-    }
-    
-    // Add coin animation
-    const animationId = Date.now() + Math.random();
-    setCoinAnimations(prev => [...prev, { id: animationId, amount: earnings, x, y }]);
-    
-    // Remove animation after completion
-    setTimeout(() => {
-      setCoinAnimations(prev => prev.filter(anim => anim.id !== animationId));
-    }, 800);
-    
-    // Update game state
-    setGameState(prev => ({
-      ...prev,
-      coins: prev.coins + earnings,
-      totalSales: prev.totalSales + earnings,
-      experience: prev.experience + experience
-    }));
-    
-    // Big sale screen shake
-    if (earnings > 100) {
-      setScreenShake(true);
-      setTimeout(() => setScreenShake(false), 300);
-    }
-    
-    // Random positive messages
-    const messages = [
-      `💰 +$${earnings}!`,
-      `🔥 Great sale!`,
-      `⚡ Combo x${comboMultiplier.toFixed(1)}!`,
-      `🎯 Perfect!`
-    ];
-    
-    if (Math.random() > 0.7) {
-      toast.success(messages[Math.floor(Math.random() * messages.length)], {
-        duration: 1000,
-      });
-    }
-  }, [gameState.clickPower, comboMultiplier, comboCount]);
 
   const upgradeProduct = useCallback((productId: string) => {
     setProducts(prev => prev.map(product => {
@@ -209,8 +215,19 @@ const TechStore: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen p-4 ${screenShake ? 'screen-shake' : ''}`}>
-      <div className="max-w-6xl mx-auto">
+    <div className={`min-h-screen p-4 relative overflow-hidden ${screenShake ? 'screen-shake' : ''}`}>
+      {/* Animated Background */}
+      <div className="fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-muted/50 to-accent/20"></div>
+        <div className="absolute top-0 left-0 w-full h-full">
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-48 h-48 bg-accent/10 rounded-full blur-3xl animate-pulse delay-500"></div>
+        </div>
+        <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
+      </div>
+      
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Header Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card className="p-4 card-glow">
@@ -255,16 +272,6 @@ const TechStore: React.FC = () => {
           </Card>
         </div>
 
-        {/* Combo Indicator */}
-        {comboCount > 0 && (
-          <div className="text-center mb-4">
-            <div className="inline-block bg-gradient-accent px-4 py-2 rounded-lg neon-glow pop-in">
-              <span className="text-lg font-bold">
-                🔥 COMBO {comboCount} • {comboMultiplier.toFixed(1)}x MULTIPLIER!
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -293,17 +300,22 @@ const TechStore: React.FC = () => {
                 
                 <h3 className="font-bold text-foreground">{product.name}</h3>
                 <div className="text-sm text-muted-foreground">
-                  Level {product.upgradeLevel}
+                  Level {product.upgradeLevel} • Sells for {formatNumber(product.sellPrice * gameState.clickPower)}
                 </div>
                 
-                <Button
-                  variant="neon"
-                  size="lg"
-                  className="w-full pulse-glow"
-                  onClick={(event) => sellProduct(product, event)}
-                >
-                  SELL {formatNumber(product.sellPrice * gameState.clickPower)}
-                </Button>
+                {/* Selling Progress Bar */}
+                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-gradient-primary h-full transition-all duration-100 rounded-full relative"
+                    style={{ width: `${productProgress[product.id] || 0}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-muted-foreground">
+                  {productProgress[product.id] >= 99 ? '💰 Selling...' : '🔄 Processing...'}
+                </div>
                 
                 <Button
                   variant="game"
