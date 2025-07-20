@@ -2,41 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* Hyper Hustle Game Design System - Cyberpunk Neon Theme
+All colors MUST be HSL for proper theming.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Dark cyberpunk base */
+    --background: 240 10% 8%;
+    --foreground: 180 100% 90%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Card system with glow effects */
+    --card: 240 15% 12%;
+    --card-foreground: 180 100% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 240 15% 12%;
+    --popover-foreground: 180 100% 95%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Neon electric blue primary */
+    --primary: 200 100% 50%;
+    --primary-foreground: 240 10% 8%;
+    --primary-glow: 200 100% 70%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Hot pink secondary */
+    --secondary: 320 100% 60%;
+    --secondary-foreground: 240 10% 8%;
+    --secondary-glow: 320 100% 80%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Acid green accent */
+    --accent: 120 100% 50%;
+    --accent-foreground: 240 10% 8%;
+    --accent-glow: 120 100% 70%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Muted dark grays */
+    --muted: 240 15% 18%;
+    --muted-foreground: 200 10% 70%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Orange warning/destructive */
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 240 10% 8%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Borders and inputs */
+    --border: 240 20% 20%;
+    --input: 240 20% 15%;
+    --ring: 200 100% 50%;
 
-    --radius: 0.5rem;
+    /* Game-specific colors */
+    --coin-gold: 45 100% 60%;
+    --coin-shadow: 45 100% 40%;
+    --success-green: 140 100% 50%;
+    --energy-purple: 280 100% 60%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(200 100% 50%), hsl(200 100% 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(320 100% 60%), hsl(320 100% 80%));
+    --gradient-accent: linear-gradient(135deg, hsl(120 100% 50%), hsl(120 100% 70%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 100% 60%), hsl(45 100% 80%));
+    --gradient-background: linear-gradient(180deg, hsl(240 10% 8%), hsl(240 15% 12%));
+    
+    /* Glows and shadows */
+    --glow-primary: 0 0 20px hsl(200 100% 50% / 0.5);
+    --glow-secondary: 0 0 20px hsl(320 100% 60% / 0.5);
+    --glow-accent: 0 0 20px hsl(120 100% 50% / 0.5);
+    --glow-gold: 0 0 15px hsl(45 100% 60% / 0.6);
+    
+    /* Animation timings */
+    --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +136,78 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    background: var(--gradient-background);
+    overflow-x: hidden;
+  }
+}
+
+/* Game Animation Keyframes */
+@layer utilities {
+  @keyframes coinBounce {
+    0% { transform: scale(0.8) translateY(0); opacity: 0; }
+    50% { transform: scale(1.2) translateY(-20px); opacity: 1; }
+    100% { transform: scale(1) translateY(-40px); opacity: 0; }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  
+  @keyframes glow {
+    0%, 100% { box-shadow: var(--glow-primary); }
+    50% { box-shadow: var(--glow-primary), var(--glow-accent); }
+  }
+  
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  @keyframes popIn {
+    0% { transform: scale(0.5); opacity: 0; }
+    80% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Game Utility Classes */
+  .coin-bounce {
+    animation: coinBounce 0.8s ease-out forwards;
+  }
+  
+  .pulse-glow {
+    animation: pulse 2s infinite, glow 3s infinite;
+  }
+  
+  .screen-shake {
+    animation: shake 0.3s ease-in-out;
+  }
+  
+  .slide-up {
+    animation: slideUp 0.4s var(--transition-smooth);
+  }
+  
+  .pop-in {
+    animation: popIn 0.3s var(--transition-bounce);
+  }
+  
+  .neon-glow {
+    text-shadow: 0 0 10px currentColor;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+  
+  .card-glow {
+    box-shadow: var(--glow-primary);
+    transition: box-shadow var(--transition-smooth);
+  }
+  
+  .card-glow:hover {
+    box-shadow: var(--glow-primary), var(--glow-accent);
   }
 }
